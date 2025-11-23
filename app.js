@@ -7,14 +7,16 @@ const firebaseConfig = {
   authDomain: "akar-literasi-navigator-weekly.firebaseapp.com",
   databaseURL: "https://akar-literasi-navigator-weekly-default-rtdb.firebaseio.com",
   projectId: "akar-literasi-navigator-weekly",
-  storageBucket: "akar-literasi-navigator-weekly.firebasestorage.app",
+  storageBucket: "akar-literasi-navigator-weekly.appspot.com",
   messagingSenderId: "755822522562",
   appId: "1:755822522562:web:ff2fc9baa0995d79cdcb5b",
   measurementId: "G-P3S98D4WPW"
 };
 
 firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+
+// Realtime Database & Auth
+const db = firebase.database();
 const auth = firebase.auth();
 
 // =========================
@@ -59,6 +61,21 @@ let tasksUnsubscribe = null;
 let scheduleUnsubscribe = null;
 
 // =========================
+// HELPER REF REALTIME DATABASE
+// =========================
+function userBaseRef(uid) {
+  return db.ref("users/" + uid);
+}
+
+function userTasksRef(uid) {
+  return db.ref("users/" + uid + "/tasks");
+}
+
+function userScheduleRef(uid) {
+  return db.ref("users/" + uid + "/schedule");
+}
+
+// =========================
 // INISIALISASI
 // =========================
 document.addEventListener("DOMContentLoaded", () => {
@@ -80,12 +97,12 @@ function initTabs() {
   const navButtons = document.querySelectorAll(".nav-link");
   const sections = document.querySelectorAll(".tab-content");
 
-  navButtons.forEach(btn => {
+  navButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
       const targetId = btn.dataset.tab;
 
-      navButtons.forEach(b => b.classList.remove("active"));
-      sections.forEach(sec => sec.classList.remove("active"));
+      navButtons.forEach((b) => b.classList.remove("active"));
+      sections.forEach((sec) => sec.classList.remove("active"));
 
       btn.classList.add("active");
       const targetSection = document.getElementById(targetId);
@@ -97,10 +114,12 @@ function initTabs() {
 }
 
 function initHeroButtonJump() {
-  document.querySelectorAll("[data-tab-jump]").forEach(btn => {
+  document.querySelectorAll("[data-tab-jump]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const targetTab = btn.dataset.tabJump;
-      const navButton = document.querySelector(`.nav-link[data-tab="${targetTab}"]`);
+      const navButton = document.querySelector(
+        `.nav-link[data-tab="${targetTab}"]`
+      );
       if (navButton) navButton.click();
     });
   });
@@ -135,7 +154,7 @@ function initAuthUI() {
     });
   }
 
-  // Tutup modal jika klik di area gelap
+  // Tutup modal jika klik area gelap
   if (modal) {
     modal.addEventListener("click", (e) => {
       if (e.target === modal) modal.classList.add("hidden");
@@ -147,8 +166,8 @@ function initAuthUI() {
     tab.addEventListener("click", () => {
       const target = tab.dataset.authTab;
 
-      authTabs.forEach(t => t.classList.remove("active"));
-      forms.forEach(f => f.classList.remove("active"));
+      authTabs.forEach((t) => t.classList.remove("active"));
+      forms.forEach((f) => f.classList.remove("active"));
 
       tab.classList.add("active");
       const targetForm = document.getElementById(`${target}-form`);
@@ -179,15 +198,20 @@ function initAuthUI() {
     registerForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const email = document.getElementById("register-email").value.trim();
-      const password = document.getElementById("register-password").value.trim();
+      const password = document
+        .getElementById("register-password")
+        .value.trim();
 
       try {
-        const cred = await auth.createUserWithEmailAndPassword(email, password);
-
-        // Buat dokumen user sederhana
-        await db.collection("users").doc(cred.user.uid).set({
+        const cred = await auth.createUserWithEmailAndPassword(
           email,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          password
+        );
+
+        // Simpan profil user sederhana di Realtime Database
+        await userBaseRef(cred.user.uid).child("profile").set({
+          email,
+          createdAt: Date.now()
         });
 
         modal.classList.add("hidden");
@@ -233,10 +257,11 @@ function handleAuthStateChanged(user) {
   if (user) {
     // Sudah login
     if (emailLabel) emailLabel.textContent = user.email || "User tanpa email";
-    if (loginBtn) loginBtn.style.display = "none";
+    if (loginBtn) loginBtn.style.display = "inline-flex";
     if (logoutBtn) logoutBtn.style.display = "inline-flex";
+    if (loginBtn) loginBtn.style.display = "none";
 
-    // Pasang listener data per user
+    // Listener data per user
     subscribeToTasksForUser(user.uid);
     subscribeToScheduleForUser(user.uid);
   } else {
@@ -252,19 +277,6 @@ function handleAuthStateChanged(user) {
     renderDashboard();
     renderEmptyScheduleGrid();
   }
-}
-
-// Helper collection
-function userTasksCollection() {
-  const user = auth.currentUser;
-  if (!user) return null;
-  return db.collection("users").doc(user.uid).collection("tasks");
-}
-
-function userScheduleCollection() {
-  const user = auth.currentUser;
-  if (!user) return null;
-  return db.collection("users").doc(user.uid).collection("schedule");
 }
 
 // =========================
@@ -292,41 +304,46 @@ function initTaskForm() {
       return;
     }
 
-    const col = userTasksCollection();
-    if (!col) return;
+    const tasksRef = userTasksRef(auth.currentUser.uid);
 
     try {
-      await col.add({
+      const newTaskRef = tasksRef.push();
+      await newTaskRef.set({
         title,
         category,
-        status: "pending", // "pending" | "done"
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        status: "pending",
+        createdAt: Date.now()
       });
 
       form.reset();
     } catch (error) {
       console.error("Gagal menambahkan task:", error);
-      alert("Gagal menyimpan task ke Firebase.");
+      alert("Gagal menyimpan task ke Realtime Database.");
     }
   });
 }
 
 // =========================
-// FIRESTORE LISTENER: TASKS
+// REALTIME LISTENER: TASKS
 // =========================
 function subscribeToTasksForUser(uid) {
-  const colRef = db
-    .collection("users")
-    .doc(uid)
-    .collection("tasks")
-    .orderBy("createdAt", "asc");
+  const ref = userTasksRef(uid);
 
-  tasksUnsubscribe = colRef.onSnapshot(
+  // Simpan fungsi unsubscribe
+  tasksUnsubscribe = () => ref.off();
+
+  ref.on(
+    "value",
     (snapshot) => {
+      const data = snapshot.val() || {};
       currentTasks = [];
-      snapshot.forEach((doc) => {
-        currentTasks.push({ id: doc.id, ...doc.data() });
+
+      Object.keys(data).forEach((key) => {
+        currentTasks.push({ id: key, ...data[key] });
       });
+
+      // Urutkan berdasarkan createdAt
+      currentTasks.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
       renderTasks();
       renderTaskSelectOptions();
@@ -379,19 +396,19 @@ function renderTasks() {
       const task = currentTasks.find((t) => t.id === id);
       if (!task) return;
 
-      if (!auth.currentUser) {
+      const user = auth.currentUser;
+      if (!user) {
         alert("Silakan login terlebih dahulu.");
         return;
       }
 
-      const col = userTasksCollection();
-      const schedCol = userScheduleCollection();
-      if (!col) return;
+      const tasksRef = userTasksRef(user.uid);
+      const scheduleRef = userScheduleRef(user.uid);
 
       if (action === "toggle") {
         try {
           const newStatus = task.status === "done" ? "pending" : "done";
-          await col.doc(id).update({ status: newStatus });
+          await tasksRef.child(id).update({ status: newStatus });
         } catch (error) {
           console.error("Gagal mengubah status task:", error);
         }
@@ -402,14 +419,22 @@ function renderTasks() {
         if (!sure) return;
 
         try {
-          if (schedCol) {
-            const schedulesSnap = await schedCol.where("taskId", "==", id).get();
-            const batch = db.batch();
-            schedulesSnap.forEach((doc) => batch.delete(doc.ref));
-            await batch.commit();
+          // Hapus semua schedule yang pakai taskId ini
+          const snap = await scheduleRef
+            .orderByChild("taskId")
+            .equalTo(id)
+            .once("value");
+
+          const updates = {};
+          snap.forEach((child) => {
+            updates[child.key] = null;
+          });
+
+          if (Object.keys(updates).length > 0) {
+            await scheduleRef.update(updates);
           }
 
-          await col.doc(id).delete();
+          await tasksRef.child(id).remove();
         } catch (error) {
           console.error("Gagal menghapus task:", error);
         }
@@ -449,7 +474,8 @@ function initScheduleForm() {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    if (!auth.currentUser) {
+    const user = auth.currentUser;
+    if (!user) {
       alert("Silakan login terlebih dahulu sebelum mengatur jadwal.");
       return;
     }
@@ -469,44 +495,47 @@ function initScheduleForm() {
       return;
     }
 
-    const col = userScheduleCollection();
-    if (!col) return;
+    const schedRef = userScheduleRef(user.uid);
 
     try {
-      await col.add({
+      const newScheduleRef = schedRef.push();
+      await newScheduleRef.set({
         day,
         time,
         taskId,
         taskTitle: task.title,
         category: task.category,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        createdAt: Date.now()
       });
 
       timeSelect.value = "";
       taskSelect.value = "";
     } catch (error) {
       console.error("Gagal menyimpan jadwal:", error);
-      alert("Gagal menyimpan jadwal ke Firebase.");
+      alert("Gagal menyimpan jadwal ke Realtime Database.");
     }
   });
 }
 
 // =========================
-// FIRESTORE LISTENER: SCHEDULE
+// REALTIME LISTENER: SCHEDULE
 // =========================
 function subscribeToScheduleForUser(uid) {
-  const colRef = db
-    .collection("users")
-    .doc(uid)
-    .collection("schedule")
-    .orderBy("createdAt", "asc");
+  const ref = userScheduleRef(uid);
 
-  scheduleUnsubscribe = colRef.onSnapshot(
+  scheduleUnsubscribe = () => ref.off();
+
+  ref.on(
+    "value",
     (snapshot) => {
+      const data = snapshot.val() || {};
       currentSchedule = [];
-      snapshot.forEach((doc) => {
-        currentSchedule.push({ id: doc.id, ...doc.data() });
+
+      Object.keys(data).forEach((key) => {
+        currentSchedule.push({ id: key, ...data[key] });
       });
+
+      currentSchedule.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
       renderScheduleTable();
     },
@@ -566,17 +595,17 @@ function renderScheduleTable() {
   // Tombol hapus di setiap item jadwal
   tbody.querySelectorAll(".schedule-item .btn-icon").forEach((btn) => {
     btn.onclick = async () => {
-      if (!auth.currentUser) {
+      const user = auth.currentUser;
+      if (!user) {
         alert("Silakan login terlebih dahulu.");
         return;
       }
 
       const id = btn.dataset.id;
-      const col = userScheduleCollection();
-      if (!col) return;
+      const schedRef = userScheduleRef(user.uid);
 
       try {
-        await col.doc(id).delete();
+        await schedRef.child(id).remove();
       } catch (error) {
         console.error("Gagal menghapus jadwal:", error);
       }
@@ -609,11 +638,14 @@ function renderDashboard() {
     li.className = "dashboard-task-item";
     if (task.status === "done") li.classList.add("done");
 
-    const statusClass = task.status === "done" ? "badge-success" : "badge-warning";
+    const statusClass =
+      task.status === "done" ? "badge-success" : "badge-warning";
     const statusText = task.status === "done" ? "Selesai" : "Belum";
 
     li.innerHTML = `
-      <span>[${getCategoryLabel(task.category)}] ${escapeHtml(task.title)}</span>
+      <span>[${getCategoryLabel(task.category)}] ${escapeHtml(
+      task.title
+    )}</span>
       <span class="badge ${statusClass}">${statusText}</span>
     `;
 

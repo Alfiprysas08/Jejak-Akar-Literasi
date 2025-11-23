@@ -80,7 +80,6 @@
       <section class="hero">
         <div class="hero-overlay">
           <div class="hero-content parchment">
-           
             <p class="hero-verse">
               “Apabila telah ditunaikan shalat, maka bertebaranlah kamu di muka bumi;
               dan carilah karunia Allah dan ingatlah Allah banyak-banyak supaya kamu beruntung.”
@@ -97,8 +96,9 @@
       <section class="home-grid">
         <div class="parchment-card">
           <h2>Peta Navigasi Mingguan</h2>
-          <p>Atur prioritas, susun rencana, dan biarkan
-              setiap harimu menjadi langkah kecil menuju keberkahan.
+          <p>
+            Atur prioritas, susun rencana, dan biarkan
+            setiap harimu menjadi langkah kecil menuju keberkahan.
             Setiap task adalah titik perjalanan dalam pekanmu. Isi dulu daftar task di tab
             <strong>Task</strong>, lalu atur jadwal spesifiknya di tab
             <strong>Weekly Tracker</strong>.
@@ -106,26 +106,21 @@
         </div>
         <div class="parchment-card">
           <h2>Matriks Eisenhower</h2>
-         
           <ul class="list-styled">
             <li><strong>Prioritas</strong> – kerjakan segera.</li>
-            <li><strong>Investasi</strong> – Kegiatan penting untuk perkembangan jangka panjang.</li>
-            <li><strong>Kegiatan Tak Terduga</strong> - Hal mendesak yang muncul tiba-tiba, tapi bukan hal utama..</li>
-            <li><strong>Refreshing</strong> – Aktivitas untuk istirahat dan mengisi ulang energi.</li>
+            <li><strong>Investasi</strong> – kegiatan penting untuk perkembangan jangka panjang.</li>
+            <li><strong>Kegiatan Tak Terduga</strong> – hal mendesak yang muncul tiba-tiba, tapi bukan hal utama.</li>
+            <li><strong>Refreshing</strong> – aktivitas untuk istirahat dan mengisi ulang energi.</li>
           </ul>
         </div>
         <div class="parchment-card">
           <h2>Waktu Berlayar</h2>
-          <p></p>
           <ul class="list-inline">
-            <li>Pagi </li>
-            <li>Siang </li>
-            <li>Sore </li>
-            <li>Malam </li>
+            <li>Pagi</li>
+            <li>Siang</li>
+            <li>Sore</li>
+            <li>Malam</li>
           </ul>
-          <p class="small-note">
-            
-          </p>
         </div>
       </section>
     </section>
@@ -214,7 +209,6 @@
           <label for="schedule-task">Task</label>
           <select id="schedule-task" required>
             <option value="">-- Pilih Task dari Daftar --</option>
-            <!-- Diisi dinamis dari Firebase -->
           </select>
         </div>
 
@@ -283,12 +277,12 @@
     <p>⚓ Jejak Akar Literasi &mdash; Semoga waktumu penuh keberkahan.</p>
   </footer>
 
- <script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-auth-compat.js"></script>
-
+  <!-- Firebase (App, Realtime Database, Auth) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-auth-compat.js"></script>
 
   <!-- App JS -->
-  <script src="app.js"></script>
+  <script src="app.js?v=2"></script>
 </body>
 </html>
