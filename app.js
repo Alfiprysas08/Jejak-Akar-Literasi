@@ -1,94 +1,180 @@
 // =========================
-// KONFIGURASI FIREBASE (PROJECT: akar-literasi-navigator-weekly)
+// FIREBASE (MODULAR CDN) + AUTH + REALTIME DATABASE
 // =========================
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-analytics.js";
 
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+} from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
+
+import {
+  getDatabase,
+  ref,
+  push,
+  set,
+  onValue,
+  off,
+  update,
+  remove,
+  query,
+  orderByChild,
+  equalTo,
+  get,
+} from "https://www.gstatic.com/firebasejs/12.7.0/firebase-database.js";
+
+// =========================
+// KONFIGURASI FIREBASE (PUNYA KAMU)
+// =========================
 const firebaseConfig = {
   apiKey: "AIzaSyBwdtgYHvSMqz6jXUisc7djvJ7ixkfK6yY",
   authDomain: "akar-literasi-navigator-weekly.firebaseapp.com",
   databaseURL: "https://akar-literasi-navigator-weekly-default-rtdb.firebaseio.com",
   projectId: "akar-literasi-navigator-weekly",
-  storageBucket: "akar-literasi-navigator-weekly.appspot.com",
+  storageBucket: "akar-literasi-navigator-weekly.firebasestorage.app",
   messagingSenderId: "755822522562",
   appId: "1:755822522562:web:ff2fc9baa0995d79cdcb5b",
-  measurementId: "G-P3S98D4WPW"
+  measurementId: "G-P3S98D4WPW",
 };
 
-firebase.initializeApp(firebaseConfig);
+// Init Firebase
+const app = initializeApp(firebaseConfig);
+try {
+  getAnalytics(app);
+} catch (_) {
+  // analytics opsional (kadang error kalau environment tertentu)
+}
 
-// Realtime Database & Auth
-const db = firebase.database();
-const auth = firebase.auth();
+const auth = getAuth(app);
+const db = getDatabase(app);
 
 // =========================
-// KONSTANTA
+// KONSTAN
 // =========================
-
-// Nilai kategori mengikuti value <option> di index.html
-const CATEGORIES = [
-  "Penting & Mendesak",           // Prioritas
-  "Penting tapi Tidak Mendesak",  // Investasi
-  "Tidak Penting tapi Mendesak",  // Kegiatan Tak Terduga
-  "Tidak Penting & Tidak Mendesak"// Refreshing
-];
-
 const TIMES_OF_DAY = ["Pagi", "Siang", "Sore", "Malam"];
 const DAYS_OF_WEEK = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
 
-// Mapping kategori → id container di HTML
 const categoryToContainerId = {
-  "Penting & Mendesak": "kuadran1-list",
-  "Penting tapi Tidak Mendesak": "kuadran2-list",
-  "Tidak Penting tapi Mendesak": "kuadran3-list",
-  "Tidak Penting & Tidak Mendesak": "kuadran4-list"
+  Primary: "primary-list",
+  Academy: "academy-list",
+  Development: "development-list",
+  Socio: "socio-list",
 };
 
-// Mapping nama kategori untuk tampilan (label baru)
-const CATEGORY_LABELS = {
-  "Penting & Mendesak": "Prioritas",
-  "Penting tapi Tidak Mendesak": "Investasi",
-  "Tidak Penting tapi Mendesak": "Kegiatan Tak Terduga",
-  "Tidak Penting & Tidak Mendesak": "Refreshing"
-};
-
-function getCategoryLabel(raw) {
-  return CATEGORY_LABELS[raw] || raw;
-}
-
-// State di memori
+// =========================
+// STATE
+// =========================
+let currentUser = null;
 let currentTasks = [];
 let currentSchedule = [];
-let tasksUnsubscribe = null;
-let scheduleUnsubscribe = null;
+
+// refs + listener handlers (buat detach)
+let tasksRef = null;
+let scheduleRef = null;
+let tasksHandler = null;
+let scheduleHandler = null;
 
 // =========================
-// HELPER REF REALTIME DATABASE
+// PATH PER USER
 // =========================
-function userBaseRef(uid) {
-  return db.ref("users/" + uid);
+function tasksPath(uid) {
+  return `users/${uid}/tasks`;
 }
-
-function userTasksRef(uid) {
-  return db.ref("users/" + uid + "/tasks");
-}
-
-function userScheduleRef(uid) {
-  return db.ref("users/" + uid + "/schedule");
+function schedulePath(uid) {
+  return `users/${uid}/schedule`;
 }
 
 // =========================
-// INISIALISASI
+// INIT UI
 // =========================
 document.addEventListener("DOMContentLoaded", () => {
   initTabs();
   initHeroButtonJump();
+  initAuthUI();
+
   initTaskForm();
   initScheduleForm();
-  initAuthUI();
   renderEmptyScheduleGrid();
+  renderDashboard();
 
-  // Dengarkan perubahan login
-  auth.onAuthStateChanged(handleAuthStateChanged);
+  // Auth state
+  onAuthStateChanged(auth, (user) => {
+    currentUser = user || null;
+    syncAuthButtons();
+
+    if (currentUser) {
+      attachDbListeners(currentUser.uid);
+    } else {
+      detachDbListeners();
+      resetUIWhenLoggedOut();
+    }
+  });
 });
+
+// =========================
+// AUTH UI (LOGIN ONLY)
+// =========================
+function initAuthUI() {
+  const modal = document.getElementById("auth-modal");
+  const openBtn = document.getElementById("btn-login-open");
+  const closeBtn = document.getElementById("auth-close");
+  const logoutBtn = document.getElementById("btn-logout");
+  const loginForm = document.getElementById("login-form");
+
+  openBtn?.addEventListener("click", () => modal?.classList.remove("hidden"));
+  closeBtn?.addEventListener("click", () => modal?.classList.add("hidden"));
+
+  modal?.addEventListener("click", (e) => {
+    if (e.target === modal) modal.classList.add("hidden");
+  });
+
+  loginForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = (document.getElementById("login-email")?.value || "").trim();
+    const password = (document.getElementById("login-password")?.value || "").trim();
+
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      modal?.classList.add("hidden");
+      loginForm.reset();
+    } catch (err) {
+      console.error("Gagal login:", err);
+      alert(err?.message || "Gagal login.");
+    }
+  });
+
+  logoutBtn?.addEventListener("click", async () => {
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error("Gagal logout:", err);
+      alert(err?.message || "Gagal logout.");
+    }
+  });
+}
+
+function syncAuthButtons() {
+  const btnLoginOpen = document.getElementById("btn-login-open");
+  const btnLogout = document.getElementById("btn-logout");
+
+  if (currentUser) {
+    btnLoginOpen?.classList.add("hidden");
+    btnLogout?.classList.remove("hidden");
+  } else {
+    btnLoginOpen?.classList.remove("hidden");
+    btnLogout?.classList.add("hidden");
+  }
+}
+
+function requireLoginOrOpenModal() {
+  if (currentUser) return true;
+  alert("Silakan login dulu ya.");
+  document.getElementById("auth-modal")?.classList.remove("hidden");
+  return false;
+}
 
 // =========================
 // NAVIGASI TAB
@@ -105,10 +191,7 @@ function initTabs() {
       sections.forEach((sec) => sec.classList.remove("active"));
 
       btn.classList.add("active");
-      const targetSection = document.getElementById(targetId);
-      if (targetSection) {
-        targetSection.classList.add("active");
-      }
+      document.getElementById(targetId)?.classList.add("active");
     });
   });
 }
@@ -117,166 +200,65 @@ function initHeroButtonJump() {
   document.querySelectorAll("[data-tab-jump]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const targetTab = btn.dataset.tabJump;
-      const navButton = document.querySelector(
-        `.nav-link[data-tab="${targetTab}"]`
-      );
-      if (navButton) navButton.click();
+      document.querySelector(`.nav-link[data-tab="${targetTab}"]`)?.click();
     });
   });
 }
 
 // =========================
-// AUTH UI
+// DB LISTENERS (PER USER)
 // =========================
-function initAuthUI() {
-  const modal = document.getElementById("auth-modal");
-  const openBtn = document.getElementById("btn-login-open");
-  const closeBtn = document.getElementById("auth-close");
-  const logoutBtn = document.getElementById("btn-logout");
+function attachDbListeners(uid) {
+  detachDbListeners();
 
-  const authTabs = document.querySelectorAll(".auth-tab");
-  const forms = document.querySelectorAll(".auth-form");
+  tasksRef = ref(db, tasksPath(uid));
+  scheduleRef = ref(db, schedulePath(uid));
 
-  const loginForm = document.getElementById("login-form");
-  const registerForm = document.getElementById("register-form");
+  tasksHandler = (snapshot) => {
+    const data = snapshot.val() || {};
+    currentTasks = Object.keys(data).map((id) => ({ id, ...data[id] }));
+    currentTasks.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
-  // Buka modal
-  if (openBtn && modal) {
-    openBtn.addEventListener("click", () => {
-      modal.classList.remove("hidden");
-    });
-  }
-
-  // Tutup modal via tombol X
-  if (closeBtn && modal) {
-    closeBtn.addEventListener("click", () => {
-      modal.classList.add("hidden");
-    });
-  }
-
-  // Tutup modal jika klik area gelap
-  if (modal) {
-    modal.addEventListener("click", (e) => {
-      if (e.target === modal) modal.classList.add("hidden");
-    });
-  }
-
-  // Tab Masuk / Daftar
-  authTabs.forEach((tab) => {
-    tab.addEventListener("click", () => {
-      const target = tab.dataset.authTab;
-
-      authTabs.forEach((t) => t.classList.remove("active"));
-      forms.forEach((f) => f.classList.remove("active"));
-
-      tab.classList.add("active");
-      const targetForm = document.getElementById(`${target}-form`);
-      if (targetForm) targetForm.classList.add("active");
-    });
-  });
-
-  // Form login
-  if (loginForm) {
-    loginForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const email = document.getElementById("login-email").value.trim();
-      const password = document.getElementById("login-password").value.trim();
-
-      try {
-        await auth.signInWithEmailAndPassword(email, password);
-        modal.classList.add("hidden");
-        loginForm.reset();
-      } catch (error) {
-        console.error("Gagal login:", error);
-        alert(error.message || "Gagal login.");
-      }
-    });
-  }
-
-  // Form daftar
-  if (registerForm) {
-    registerForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const email = document.getElementById("register-email").value.trim();
-      const password = document
-        .getElementById("register-password")
-        .value.trim();
-
-      try {
-        const cred = await auth.createUserWithEmailAndPassword(
-          email,
-          password
-        );
-
-        // Simpan profil user sederhana di Realtime Database
-        await userBaseRef(cred.user.uid).child("profile").set({
-          email,
-          createdAt: Date.now()
-        });
-
-        modal.classList.add("hidden");
-        registerForm.reset();
-        alert("Akun berhasil dibuat. Kamu sudah login.");
-      } catch (error) {
-        console.error("Gagal daftar:", error);
-        alert(error.message || "Gagal mendaftar.");
-      }
-    });
-  }
-
-  // Logout
-  if (logoutBtn) {
-    logoutBtn.addEventListener("click", async () => {
-      try {
-        await auth.signOut();
-      } catch (error) {
-        console.error("Gagal logout:", error);
-      }
-    });
-  }
-}
-
-// =========================
-// AUTH STATE HANDLER
-// =========================
-function handleAuthStateChanged(user) {
-  const emailLabel = document.getElementById("user-email-label");
-  const loginBtn = document.getElementById("btn-login-open");
-  const logoutBtn = document.getElementById("btn-logout");
-
-  // Matikan listener lama dulu
-  if (tasksUnsubscribe) {
-    tasksUnsubscribe();
-    tasksUnsubscribe = null;
-  }
-  if (scheduleUnsubscribe) {
-    scheduleUnsubscribe();
-    scheduleUnsubscribe = null;
-  }
-
-  if (user) {
-    // Sudah login
-    if (emailLabel) emailLabel.textContent = user.email || "User tanpa email";
-    if (loginBtn) loginBtn.style.display = "inline-flex";
-    if (logoutBtn) logoutBtn.style.display = "inline-flex";
-    if (loginBtn) loginBtn.style.display = "none";
-
-    // Listener data per user
-    subscribeToTasksForUser(user.uid);
-    subscribeToScheduleForUser(user.uid);
-  } else {
-    // Belum login
-    if (emailLabel) emailLabel.textContent = "Belum login";
-    if (loginBtn) loginBtn.style.display = "inline-flex";
-    if (logoutBtn) logoutBtn.style.display = "none";
-
-    currentTasks = [];
-    currentSchedule = [];
     renderTasks();
     renderTaskSelectOptions();
     renderDashboard();
-    renderEmptyScheduleGrid();
-  }
+  };
+
+  scheduleHandler = (snapshot) => {
+    const data = snapshot.val() || {};
+    currentSchedule = Object.keys(data).map((id) => ({ id, ...data[id] }));
+    currentSchedule.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    renderScheduleTable();
+  };
+
+  onValue(tasksRef, tasksHandler, (err) => console.error("Error tasks:", err));
+  onValue(scheduleRef, scheduleHandler, (err) => console.error("Error schedule:", err));
+}
+
+function detachDbListeners() {
+  if (tasksRef && tasksHandler) off(tasksRef, "value", tasksHandler);
+  if (scheduleRef && scheduleHandler) off(scheduleRef, "value", scheduleHandler);
+
+  tasksRef = null;
+  scheduleRef = null;
+  tasksHandler = null;
+  scheduleHandler = null;
+
+  currentTasks = [];
+  currentSchedule = [];
+}
+
+function resetUIWhenLoggedOut() {
+  Object.values(categoryToContainerId).forEach((id) => {
+    const container = document.getElementById(id);
+    if (container) container.innerHTML = "";
+  });
+
+  const select = document.getElementById("schedule-task");
+  if (select) select.innerHTML = `<option value="">-- Pilih Task dari Daftar --</option>`;
+
+  renderEmptyScheduleGrid();
+  renderDashboard();
 }
 
 // =========================
@@ -286,84 +268,45 @@ function initTaskForm() {
   const form = document.getElementById("task-form");
   const titleInput = document.getElementById("task-title");
   const categorySelect = document.getElementById("task-category");
-
   if (!form) return;
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const title = titleInput.value.trim();
-    const category = categorySelect.value;
+    if (!requireLoginOrOpenModal()) return;
 
-    if (!auth.currentUser) {
-      alert("Silakan login terlebih dahulu sebelum menambahkan task.");
-      return;
-    }
+    const title = (titleInput?.value || "").trim();
+    const category = categorySelect?.value;
 
     if (!title || !category) {
-      alert("Isi nama task dan pilih kuadran dulu ya.");
+      alert("Isi nama task dan pilih kategori dulu ya.");
       return;
     }
 
-    const tasksRef = userTasksRef(auth.currentUser.uid);
-
     try {
-      const newTaskRef = tasksRef.push();
-      await newTaskRef.set({
+      const newRef = push(ref(db, tasksPath(currentUser.uid)));
+      await set(newRef, {
         title,
         category,
         status: "pending",
-        createdAt: Date.now()
+        createdAt: Date.now(),
       });
-
       form.reset();
-    } catch (error) {
-      console.error("Gagal menambahkan task:", error);
+    } catch (err) {
+      console.error("Gagal menambahkan task:", err);
       alert("Gagal menyimpan task ke Realtime Database.");
     }
   });
 }
 
 // =========================
-// REALTIME LISTENER: TASKS
+// RENDER TASKS
 // =========================
-function subscribeToTasksForUser(uid) {
-  const ref = userTasksRef(uid);
-
-  // Simpan fungsi unsubscribe
-  tasksUnsubscribe = () => ref.off();
-
-  ref.on(
-    "value",
-    (snapshot) => {
-      const data = snapshot.val() || {};
-      currentTasks = [];
-
-      Object.keys(data).forEach((key) => {
-        currentTasks.push({ id: key, ...data[key] });
-      });
-
-      // Urutkan berdasarkan createdAt
-      currentTasks.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-
-      renderTasks();
-      renderTaskSelectOptions();
-      renderDashboard();
-    },
-    (error) => {
-      console.error("Error mengambil tasks:", error);
-    }
-  );
-}
-
-// RENDER TASK KE KOLUMNYA
 function renderTasks() {
-  // Kosongkan semua list
   Object.values(categoryToContainerId).forEach((id) => {
     const container = document.getElementById(id);
     if (container) container.innerHTML = "";
   });
 
-  // Render per task
   currentTasks.forEach((task) => {
     const containerId = categoryToContainerId[task.category];
     const container = document.getElementById(containerId);
@@ -388,55 +331,46 @@ function renderTasks() {
     container.appendChild(card);
   });
 
-  // Event listener untuk tombol (toggle & delete)
   document.querySelectorAll(".task-actions button").forEach((btn) => {
     btn.onclick = async () => {
+      if (!requireLoginOrOpenModal()) return;
+
       const id = btn.dataset.id;
       const action = btn.dataset.action;
       const task = currentTasks.find((t) => t.id === id);
       if (!task) return;
 
-      const user = auth.currentUser;
-      if (!user) {
-        alert("Silakan login terlebih dahulu.");
-        return;
-      }
-
-      const tasksRef = userTasksRef(user.uid);
-      const scheduleRef = userScheduleRef(user.uid);
-
       if (action === "toggle") {
         try {
           const newStatus = task.status === "done" ? "pending" : "done";
-          await tasksRef.child(id).update({ status: newStatus });
-        } catch (error) {
-          console.error("Gagal mengubah status task:", error);
+          await update(ref(db, `${tasksPath(currentUser.uid)}/${id}`), { status: newStatus });
+        } catch (err) {
+          console.error("Gagal mengubah status task:", err);
         }
-      } else if (action === "delete") {
-        const sure = confirm(
-          "Yakin ingin menghapus task ini? Task juga akan dihapus dari jadwal."
-        );
+      }
+
+      if (action === "delete") {
+        const sure = confirm("Yakin ingin menghapus task ini? Task juga akan dihapus dari jadwal.");
         if (!sure) return;
 
         try {
-          // Hapus semua schedule yang pakai taskId ini
-          const snap = await scheduleRef
-            .orderByChild("taskId")
-            .equalTo(id)
-            .once("value");
+          // hapus semua schedule yang pakai taskId ini
+          const sBase = ref(db, schedulePath(currentUser.uid));
+          const q = query(sBase, orderByChild("taskId"), equalTo(id));
+          const snap = await get(q);
 
-          const updates = {};
+          const updatesMap = {};
           snap.forEach((child) => {
-            updates[child.key] = null;
+            updatesMap[child.key] = null;
           });
 
-          if (Object.keys(updates).length > 0) {
-            await scheduleRef.update(updates);
+          if (Object.keys(updatesMap).length > 0) {
+            await update(sBase, updatesMap);
           }
 
-          await tasksRef.child(id).remove();
-        } catch (error) {
-          console.error("Gagal menghapus task:", error);
+          await remove(ref(db, `${tasksPath(currentUser.uid)}/${id}`));
+        } catch (err) {
+          console.error("Gagal menghapus task:", err);
         }
       }
     };
@@ -451,11 +385,10 @@ function renderTaskSelectOptions() {
   if (!select) return;
 
   select.innerHTML = `<option value="">-- Pilih Task dari Daftar --</option>`;
-
   currentTasks.forEach((task) => {
     const opt = document.createElement("option");
     opt.value = task.id;
-    opt.textContent = `[${getCategoryLabel(task.category)}] ${task.title}`;
+    opt.textContent = `[${task.category}] ${task.title}`;
     select.appendChild(opt);
   });
 }
@@ -473,19 +406,14 @@ function initScheduleForm() {
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (!requireLoginOrOpenModal()) return;
 
-    const user = auth.currentUser;
-    if (!user) {
-      alert("Silakan login terlebih dahulu sebelum mengatur jadwal.");
-      return;
-    }
-
-    const day = daySelect.value;
-    const time = timeSelect.value;
-    const taskId = taskSelect.value;
+    const day = daySelect?.value;
+    const time = timeSelect?.value;
+    const taskId = taskSelect?.value;
 
     if (!day || !time || !taskId) {
-      alert("Pilih hari, waktu, dan task dulu.");
+      alert("Pilih hari, waktu, dan task dulu ya.");
       return;
     }
 
@@ -495,57 +423,29 @@ function initScheduleForm() {
       return;
     }
 
-    const schedRef = userScheduleRef(user.uid);
-
     try {
-      const newScheduleRef = schedRef.push();
-      await newScheduleRef.set({
+      const newRef = push(ref(db, schedulePath(currentUser.uid)));
+      await set(newRef, {
         day,
         time,
         taskId,
         taskTitle: task.title,
         category: task.category,
-        createdAt: Date.now()
+        createdAt: Date.now(),
       });
 
-      timeSelect.value = "";
-      taskSelect.value = "";
-    } catch (error) {
-      console.error("Gagal menyimpan jadwal:", error);
-      alert("Gagal menyimpan jadwal ke Realtime Database.");
+      if (timeSelect) timeSelect.value = "";
+      if (taskSelect) taskSelect.value = "";
+    } catch (err) {
+      console.error("Gagal menyimpan jadwal:", err);
+      alert("Gagal menyimpan ke Realtime Database.");
     }
   });
 }
 
 // =========================
-// REALTIME LISTENER: SCHEDULE
+// SCHEDULE TABLE
 // =========================
-function subscribeToScheduleForUser(uid) {
-  const ref = userScheduleRef(uid);
-
-  scheduleUnsubscribe = () => ref.off();
-
-  ref.on(
-    "value",
-    (snapshot) => {
-      const data = snapshot.val() || {};
-      currentSchedule = [];
-
-      Object.keys(data).forEach((key) => {
-        currentSchedule.push({ id: key, ...data[key] });
-      });
-
-      currentSchedule.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-
-      renderScheduleTable();
-    },
-    (error) => {
-      console.error("Error mengambil schedule:", error);
-    }
-  );
-}
-
-// Buat grid kosong
 function renderEmptyScheduleGrid() {
   const tbody = document.getElementById("schedule-body");
   if (!tbody) return;
@@ -570,7 +470,6 @@ function renderEmptyScheduleGrid() {
   });
 }
 
-// Isi grid dengan data schedule
 function renderScheduleTable() {
   renderEmptyScheduleGrid();
   const tbody = document.getElementById("schedule-body");
@@ -583,31 +482,22 @@ function renderScheduleTable() {
 
     const item = document.createElement("div");
     item.className = "schedule-item";
-
     item.innerHTML = `
       <span class="schedule-task-title">${escapeHtml(entry.taskTitle)}</span>
       <button class="btn-icon" data-id="${entry.id}" title="Hapus dari jadwal">✕</button>
     `;
-
     cell.appendChild(item);
   });
 
-  // Tombol hapus di setiap item jadwal
   tbody.querySelectorAll(".schedule-item .btn-icon").forEach((btn) => {
     btn.onclick = async () => {
-      const user = auth.currentUser;
-      if (!user) {
-        alert("Silakan login terlebih dahulu.");
-        return;
-      }
+      if (!requireLoginOrOpenModal()) return;
 
       const id = btn.dataset.id;
-      const schedRef = userScheduleRef(user.uid);
-
       try {
-        await schedRef.child(id).remove();
-      } catch (error) {
-        console.error("Gagal menghapus jadwal:", error);
+        await remove(ref(db, `${schedulePath(currentUser.uid)}/${id}`));
+      } catch (err) {
+        console.error("Gagal menghapus jadwal:", err);
       }
     };
   });
@@ -638,17 +528,13 @@ function renderDashboard() {
     li.className = "dashboard-task-item";
     if (task.status === "done") li.classList.add("done");
 
-    const statusClass =
-      task.status === "done" ? "badge-success" : "badge-warning";
+    const statusClass = task.status === "done" ? "badge-success" : "badge-warning";
     const statusText = task.status === "done" ? "Selesai" : "Belum";
 
     li.innerHTML = `
-      <span>[${getCategoryLabel(task.category)}] ${escapeHtml(
-      task.title
-    )}</span>
+      <span>[${task.category}] ${escapeHtml(task.title)}</span>
       <span class="badge ${statusClass}">${statusText}</span>
     `;
-
     list.appendChild(li);
   });
 }
@@ -658,7 +544,7 @@ function renderDashboard() {
 // =========================
 function escapeHtml(text) {
   if (!text) return "";
-  return text
+  return String(text)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")

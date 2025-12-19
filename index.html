@@ -16,6 +16,7 @@
     <div class="logo">
       ⛵ Jejak Akar Literasi
     </div>
+
     <nav>
       <ul class="nav-links">
         <li><button class="nav-link active" data-tab="home">Home</button></li>
@@ -25,29 +26,23 @@
       </ul>
     </nav>
 
-    <div class="auth-status">
-      <span id="user-email-label" class="user-email">Belum login</span>
-      <button id="btn-login-open" class="btn-secondary btn-small">Masuk / Daftar</button>
-      <button id="btn-logout" class="btn-secondary btn-small" style="display:none;">Keluar</button>
+    <!-- AUTH CONTROLS -->
+    <div class="navbar-right">
+      <button id="btn-login-open" class="btn-secondary btn-small">Login</button>
+      <button id="btn-logout" class="btn-danger btn-small hidden">Logout</button>
     </div>
   </header>
 
-  <!-- AUTH MODAL -->
+  <!-- AUTH MODAL (LOGIN ONLY) -->
   <div id="auth-modal" class="auth-modal hidden">
     <div class="auth-card parchment-card">
       <button id="auth-close" class="auth-close-btn" title="Tutup">✕</button>
-      <h2>Akun Akar Literasi</h2>
+      <h2>Akun Weekly Tracker</h2>
       <p class="auth-subtitle">
-        Buat akun atau masuk untuk menyimpan task & jadwal pribadimu.
+        Masuk untuk menyimpan task & jadwal pribadimu.
       </p>
 
-      <div class="auth-tabs">
-        <button class="auth-tab active" data-auth-tab="login">Masuk</button>
-        <button class="auth-tab" data-auth-tab="register">Daftar</button>
-      </div>
-
-      <!-- LOGIN FORM -->
-      <form id="login-form" class="auth-form active">
+      <form id="login-form" class="auth-form">
         <div class="form-group">
           <label for="login-email">Email</label>
           <input type="email" id="login-email" placeholder="emailmu@example.com" required />
@@ -58,19 +53,6 @@
         </div>
         <button type="submit" class="btn-primary">Masuk</button>
       </form>
-
-      <!-- REGISTER FORM -->
-      <form id="register-form" class="auth-form">
-        <div class="form-group">
-          <label for="register-email">Email</label>
-          <input type="email" id="register-email" placeholder="emailmu@example.com" required />
-        </div>
-        <div class="form-group">
-          <label for="register-password">Password</label>
-          <input type="password" id="register-password" placeholder="Minimal 6 karakter" required />
-        </div>
-        <button type="submit" class="btn-primary">Daftar</button>
-      </form>
     </div>
   </div>
 
@@ -80,14 +62,14 @@
       <section class="hero">
         <div class="hero-overlay">
           <div class="hero-content parchment">
-            <p class="hero-verse">
+      
+           <p class="hero-verse">
               “Apabila telah ditunaikan shalat, maka bertebaranlah kamu di muka bumi;
               dan carilah karunia Allah dan ingatlah Allah banyak-banyak supaya kamu beruntung.”
-              <br><span class="hero-ref">— Al-Jumu’ah ayat 10</span>
+              <br><span class="hero-ref">Al-Jumu’ah ayat 10</span>
             </p>
-
             <button class="btn-primary" data-tab-jump="tasks">
-              Mari Kita Berlayar⚓
+              Mulai Mengisi Task ⚓
             </button>
           </div>
         </div>
@@ -95,31 +77,29 @@
 
       <section class="home-grid">
         <div class="parchment-card">
-          <h2>Peta Navigasi Mingguan</h2>
+          <h2>Peta Mingguan</h2>
           <p>
-            Atur prioritas, susun rencana, dan biarkan
-            setiap harimu menjadi langkah kecil menuju keberkahan.
-            Setiap task adalah titik perjalanan dalam pekanmu. Isi dulu daftar task di tab
-            <strong>Task</strong>, lalu atur jadwal spesifiknya di tab
-            <strong>Weekly Tracker</strong>.
+            Naik ke kapal Mardhotillah, atur rute satu minggu ke depan,
+              dan pastikan Firdaus tujuan akhirmu
           </p>
         </div>
         <div class="parchment-card">
-          <h2>Matriks Eisenhower</h2>
+          <h2> Matriks Waktu</h2>
           <ul class="list-styled">
-            <li><strong>Prioritas</strong> – kerjakan segera.</li>
-            <li><strong>Investasi</strong> – kegiatan penting untuk perkembangan jangka panjang.</li>
-            <li><strong>Kegiatan Tak Terduga</strong> – hal mendesak yang muncul tiba-tiba, tapi bukan hal utama.</li>
-            <li><strong>Refreshing</strong> – aktivitas untuk istirahat dan mengisi ulang energi.</li>
+            <li><strong>Primary</strong> – hal paling utama</li>
+            <li><strong>Secondary</strong> – tugas kampus, kelas, kursus</li>
+            <li><strong>Development</strong> – skill, project, baca buku,.</li>
+            <li><strong>Socio</strong> – relasi, sosialisasi, kegiatan sosial.</li>
           </ul>
         </div>
         <div class="parchment-card">
           <h2>Waktu Berlayar</h2>
+          <p>Hari dibagi menjadi empat waktu:</p>
           <ul class="list-inline">
-            <li>Pagi</li>
-            <li>Siang</li>
-            <li>Sore</li>
-            <li>Malam</li>
+            <li>Pagi </li>
+            <li>Siang </li>
+            <li>Sore </li>
+            <li>Malam </li>
           </ul>
         </div>
       </section>
@@ -128,24 +108,24 @@
     <!-- TASKS -->
     <section id="tasks" class="tab-content">
       <h1>Daftar Task Mingguan</h1>
-      <p class="section-subtitle section-subtitle-small">
-        <strong>Catatan:</strong> Task & jadwal tersimpan per akun. Pastikan kamu sudah
-        <em>login</em> terlebih dahulu.
+      <p class="section-subtitle">
+        Isi semua task yang ingin kamu kerjakan minggu ini. Nanti task-task ini
+        bisa kamu masukkan ke jadwal di tab <strong>Weekly Tracker</strong>.
       </p>
 
       <form id="task-form" class="parchment-card task-form">
         <div class="form-group">
           <label for="task-title">Nama Task</label>
-          <input type="text" id="task-title" placeholder="Contoh: Menyusun bahan diskusi Akar Literasi" required />
+          <input type="text" id="task-title" placeholder="Contoh: Mengerjakan tugas SMA" required />
         </div>
         <div class="form-group">
-          <label for="task-category">Kuadran</label>
+          <label for="task-category">Kategori</label>
           <select id="task-category" required>
-            <option value="">-- Pilih Kuadran --</option>
-            <option value="Penting & Mendesak">Prioritas</option>
-            <option value="Penting tapi Tidak Mendesak">Investasi</option>
-            <option value="Tidak Penting tapi Mendesak">Kegiatan Tak Terduga</option>
-            <option value="Tidak Penting & Tidak Mendesak">Refreshing</option>
+            <option value="">-- Pilih Kategori --</option>
+            <option value="Primary">Primary</option>
+            <option value="Academy">Secondary</option>
+            <option value="Development">Development</option>
+            <option value="Socio">Socio</option>
           </select>
         </div>
         <button type="submit" class="btn-primary">Tambah Task</button>
@@ -153,20 +133,20 @@
 
       <section class="task-columns">
         <div class="task-column">
-          <h2>Prioritas</h2>
-          <div id="kuadran1-list" class="task-list"></div>
+          <h2>Primary</h2>
+          <div id="primary-list" class="task-list"></div>
         </div>
         <div class="task-column">
-          <h2>Investasi</h2>
-          <div id="kuadran2-list" class="task-list"></div>
+          <h2>Academy</h2>
+          <div id="academy-list" class="task-list"></div>
         </div>
         <div class="task-column">
-          <h2>Kegiatan Tak Terduga</h2>
-          <div id="kuadran3-list" class="task-list"></div>
+          <h2>Development</h2>
+          <div id="development-list" class="task-list"></div>
         </div>
         <div class="task-column">
-          <h2>Refreshing</h2>
-          <div id="kuadran4-list" class="task-list"></div>
+          <h2>Socio</h2>
+          <div id="socio-list" class="task-list"></div>
         </div>
       </section>
     </section>
@@ -176,7 +156,7 @@
       <h1>Weekly Tracker</h1>
       <p class="section-subtitle">
         Atur kapan kamu mengerjakan setiap task. Pilih hari, waktu, dan task,
-        lalu tambahkan ke jadwal. Semua data hanya milik akunmu.
+        lalu tambahkan ke jadwal.
       </p>
 
       <form id="schedule-form" class="parchment-card schedule-form">
@@ -199,7 +179,7 @@
           <select id="schedule-time" required>
             <option value="">-- Pilih Waktu --</option>
             <option value="Pagi">Pagi</option>
-            <option value="Siang">Siang</option>
+            <option value="Siang">siang</option>
             <option value="Sore">Sore</option>
             <option value="Malam">Malam</option>
           </select>
@@ -243,10 +223,10 @@
 
     <!-- DASHBOARD -->
     <section id="dashboard" class="tab-content">
-      <h1>Dashboard Navigator</h1>
+      <h1>Dashboard Kapten</h1>
       <p class="section-subtitle">
-        Lihat progres mingguanmu. Berapa banyak task yang sudah tuntas dan mana yang masih menunggu.
-        Data ini spesifik untuk akun yang sedang login.
+        Lihat progres perjalananmu minggu ini. Berapa banyak task yang sudah
+        diselesaikan, dan mana yang masih menunggu untuk dikerjakan.
       </p>
 
       <section class="dashboard-stats">
@@ -277,12 +257,7 @@
     <p>⚓ Jejak Akar Literasi &mdash; Semoga waktumu penuh keberkahan.</p>
   </footer>
 
-  <!-- Firebase (App, Realtime Database, Auth) -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-auth-compat.js"></script>
-
-  <!-- App JS -->
-  <script src="app.js?v=2"></script>
+  <!-- App JS (Firebase modular ada di dalam app.js) -->
+  <script type="module" src="app.js"></script>
 </body>
 </html>
